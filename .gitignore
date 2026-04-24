@@ -1,0 +1,16 @@
+# Maven build output
+target/
+
+# Serialized data files (runtime data, not source)
+data/*.dat
+
+# IDE project files
+.idea/
+*.iml
+.vscode/
+nbproject/
+nbactions.xml
+
+# OS files
+.DS_Store
+Thumbs.db
