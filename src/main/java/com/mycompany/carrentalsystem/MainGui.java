@@ -1,97 +1,158 @@
 package com.mycompany.carrentalsystem;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatClientProperties;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.TitledBorder;
+import javax.swing.border.MatteBorder;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.List;
 
-/**
- * Main GUI for the Car Rental System.
- * Built with Java Swing — tabbed pane layout with five functional panels.
- */
 public class MainGui extends JFrame {
 
-    // ── Colour palette ───────────────────────────────────────────────────────
-    private static final Color BG_MAIN    = new Color(240, 244, 248);
-    private static final Color BG_PANEL   = new Color(255, 255, 255);
-    private static final Color COLOR_BLUE = new Color(41, 128, 185);
-    private static final Color COLOR_GREEN= new Color(39, 174,  96);
-    private static final Color COLOR_RED  = new Color(192,  57,  43);
-    private static final Color COLOR_DARK = new Color(44,  62,  80);
-    private static final Font  FONT_LABEL = new Font("Segoe UI", Font.PLAIN, 13);
-    private static final Font  FONT_TITLE = new Font("Segoe UI", Font.BOLD,  14);
+    // ── Palette (dark theme accents) ─────────────────────────────────────────
+    private static final Color ACCENT       = new Color(99, 102, 241);   // indigo
+    private static final Color ACCENT_HOVER = new Color(79,  70, 229);
+    private static final Color SUCCESS      = new Color(34, 197,  94);
+    private static final Color DANGER       = new Color(239,  68,  68);
+    private static final Color WARNING      = new Color(251, 191,  36);
+    private static final Color TEXT_MUTED   = new Color(148, 163, 184);
+    private static final Font  FONT_UI      = new Font("Segoe UI", Font.PLAIN,  13);
+    private static final Font  FONT_BOLD    = new Font("Segoe UI", Font.BOLD,   13);
+    private static final Font  FONT_HEADER  = new Font("Segoe UI", Font.BOLD,   22);
+    private static final Font  FONT_SUB     = new Font("Segoe UI", Font.PLAIN,  12);
 
-    // ── Core service ─────────────────────────────────────────────────────────
+    // ── Service ───────────────────────────────────────────────────────────────
     private final RentalSystem system = new RentalSystem();
 
-    // ── Add-Car fields ───────────────────────────────────────────────────────
-    private JTextField  tfBrand, tfModel, tfPlate, tfPrice;
+    // ── Add-Car ───────────────────────────────────────────────────────────────
+    private JTextField tfBrand, tfModel, tfPlate, tfPrice;
     private JComboBox<String> cbCarType;
 
-    // ── Rent-Car fields ──────────────────────────────────────────────────────
+    // ── Rent-Car ──────────────────────────────────────────────────────────────
     private JComboBox<String> cbRentType, cbRentCar;
-    private JTextField  tfCustName, tfCustPhone, tfCustCnic;
-    private JSpinner    spDays;
+    private JTextField tfCustName, tfCustPhone, tfCustCnic;
+    private JSpinner   spDays;
 
-    // ── Return-Car fields ────────────────────────────────────────────────────
+    // ── Return-Car ────────────────────────────────────────────────────────────
     private JComboBox<String> cbReturnCar;
 
-    // ── View-Cars table ──────────────────────────────────────────────────────
+    // ── View-Cars ─────────────────────────────────────────────────────────────
     private DefaultTableModel tmAvailable, tmRented;
     private JTextField tfSearch;
 
-    // ── Rental History table ─────────────────────────────────────────────────
+    // ── History ───────────────────────────────────────────────────────────────
     private DefaultTableModel tmHistory;
 
     // ─────────────────────────────────────────────────────────────────────────
 
     public MainGui() {
-        applySystemLookAndFeel();
         setTitle("Car Rental System");
-        setSize(750, 520);
-        setMinimumSize(new Dimension(650, 460));
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(880, 600);
+        setMinimumSize(new Dimension(780, 520));
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        getContentPane().setBackground(BG_MAIN);
 
-        JTabbedPane tabs = new JTabbedPane(JTabbedPane.TOP);
-        tabs.setFont(FONT_TITLE);
+        // ── Root layout ───────────────────────────────────────────────────────
+        JPanel root = new JPanel(new BorderLayout());
+        root.add(buildHeader(), BorderLayout.NORTH);
+        root.add(buildTabs(),   BorderLayout.CENTER);
+        setContentPane(root);
+
+        refreshAll();
+    }
+
+    // ══════════════════════════  HEADER  ═════════════════════════════════════
+
+    private JPanel buildHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(ACCENT);
+        header.setBorder(new EmptyBorder(16, 28, 16, 28));
+
+        JLabel title = new JLabel("  Car Rental System");
+        title.setFont(FONT_HEADER);
+        title.setForeground(Color.WHITE);
+        title.setIcon(colorIcon(Color.WHITE, 28));   // small circle icon
+
+        JLabel sub = new JLabel("Manage your fleet · Track rentals · View history");
+        sub.setFont(FONT_SUB);
+        sub.setForeground(new Color(199, 210, 254));
+
+        JPanel left = new JPanel(new GridLayout(2, 1, 0, 2));
+        left.setOpaque(false);
+        left.add(title);
+        left.add(sub);
+
+        // Stats badge on the right
+        JLabel stats = new JLabel();
+        stats.setFont(FONT_BOLD);
+        stats.setForeground(new Color(224, 231, 255));
+        updateStatsBadge(stats);
+        this.statsBadge = stats;
+
+        header.add(left,  BorderLayout.WEST);
+        header.add(stats, BorderLayout.EAST);
+        return header;
+    }
+
+    private JLabel statsBadge;
+
+    private void updateStatsBadge(JLabel label) {
+        int total    = system.getCars().size();
+        int available = (int) system.getCars().stream().filter(Car::isAvailable).count();
+        int rented   = total - available;
+        label.setText(String.format("Total: %d   Available: %d   Rented: %d", total, available, rented));
+    }
+
+    // ══════════════════════════  TABS  ═══════════════════════════════════════
+
+    private JTabbedPane buildTabs() {
+        JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
+        tabs.setFont(FONT_BOLD);
+        tabs.putClientProperty(FlatClientProperties.TABBED_PANE_TAB_WIDTH_MODE,
+                FlatClientProperties.TABBED_PANE_TAB_WIDTH_MODE_PREFERRED);
+        tabs.putClientProperty(FlatClientProperties.TABBED_PANE_TAB_HEIGHT, 44);
+
         tabs.addTab("  Add Car  ",     buildAddCarPanel());
         tabs.addTab("  Rent Car  ",    buildRentCarPanel());
         tabs.addTab("  Return Car  ",  buildReturnCarPanel());
         tabs.addTab("  View Cars  ",   buildViewCarsPanel());
         tabs.addTab("  History  ",     buildHistoryPanel());
-
-        add(tabs);
-        refreshAll();
+        return tabs;
     }
 
-    // ═════════════════════════  TAB 1 — ADD CAR  ═════════════════════════════
+    // ═══════════════════  TAB 1 — ADD CAR  ═══════════════════════════════════
 
     private JPanel buildAddCarPanel() {
-        JPanel panel = formPanel(new Color(245, 250, 255));
+        JPanel wrap = centeredCard();
 
-        tfBrand = new JTextField(15);
-        tfModel = new JTextField(15);
-        tfPlate = new JTextField(15);
-        tfPrice = new JTextField(15);
-        cbCarType = new JComboBox<>(new String[]{"Economy", "Luxury", "SUV"});
+        tfBrand   = roundedField();
+        tfModel   = roundedField();
+        tfPlate   = roundedField();
+        tfPrice   = roundedField();
+        cbCarType = styledCombo(new String[]{"Economy", "Luxury", "SUV"});
 
-        int row = 0;
-        addRow(panel, row++, "Brand:",      tfBrand);
-        addRow(panel, row++, "Model:",      tfModel);
-        addRow(panel, row++, "Plate No:",   tfPlate);
-        addRow(panel, row++, "Price/Day (Rs):", tfPrice);
-        addRow(panel, row++, "Car Type:",   cbCarType);
+        JPanel form = new JPanel(new GridLayout(5, 2, 12, 14));
+        form.setOpaque(false);
+        form.add(label("Brand"));          form.add(tfBrand);
+        form.add(label("Model"));          form.add(tfModel);
+        form.add(label("Plate Number"));   form.add(tfPlate);
+        form.add(label("Price / Day (Rs)")); form.add(tfPrice);
+        form.add(label("Car Type"));       form.add(cbCarType);
 
-        JButton btnAdd = styledButton("Add Car", COLOR_BLUE);
-        btnAdd.addActionListener(e -> onAddCar());
-        addWideButton(panel, row, btnAdd);
+        JButton btn = accentButton("Add Car", ACCENT);
+        btn.addActionListener(e -> onAddCar());
 
-        return panel;
+        JPanel card = card("Add New Car");
+        card.add(form, BorderLayout.CENTER);
+        card.add(btn,  BorderLayout.SOUTH);
+
+        wrap.add(card);
+        return wrap;
     }
 
     private void onAddCar() {
@@ -101,21 +162,17 @@ public class MainGui extends JFrame {
         String priceText = tfPrice.getText().trim();
 
         if (brand.isEmpty() || model.isEmpty() || plate.isEmpty() || priceText.isEmpty()) {
-            showError("Please fill in all fields.");
-            return;
+            showError("Please fill in all fields."); return;
         }
         if (system.plateExists(plate)) {
-            showError("A car with plate number \"" + plate + "\" already exists.");
-            return;
+            showError("Plate \"" + plate + "\" already exists."); return;
         }
-
         double price;
         try {
             price = Double.parseDouble(priceText);
             if (price <= 0) throw new NumberFormatException();
         } catch (NumberFormatException ex) {
-            showError("Enter a valid positive number for Price/Day.");
-            return;
+            showError("Enter a valid positive number for Price/Day."); return;
         }
 
         String type = (String) cbCarType.getSelectedItem();
@@ -124,265 +181,240 @@ public class MainGui extends JFrame {
             case "SUV"    -> new SUVCar(brand, model, plate, price);
             default       -> new EconomyCar(brand, model, plate, price);
         };
-
         system.addCar(car);
-        showInfo("Car added successfully!\n" + car.getDisplayKey());
+        showSuccess("Car added: " + car.getDisplayKey());
         tfBrand.setText(""); tfModel.setText(""); tfPlate.setText(""); tfPrice.setText("");
         refreshAll();
     }
 
-    // ════════════════════════  TAB 2 — RENT CAR  ═════════════════════════════
+    // ═══════════════════  TAB 2 — RENT CAR  ══════════════════════════════════
 
     private JPanel buildRentCarPanel() {
-        JPanel panel = formPanel(new Color(245, 255, 250));
+        JPanel wrap = centeredCard();
 
-        cbRentType = new JComboBox<>(new String[]{"Economy", "Luxury", "SUV"});
+        cbRentType = styledCombo(new String[]{"Economy", "Luxury", "SUV"});
         cbRentType.addActionListener(e -> refreshRentCarBox());
-        cbRentCar  = new JComboBox<>();
+        cbRentCar  = styledCombo(new String[]{});
 
-        tfCustName  = new JTextField(15);
-        tfCustPhone = new JTextField(15);
-        tfCustCnic  = new JTextField(15);
+        tfCustName  = roundedField();
+        tfCustPhone = roundedField();
+        tfCustCnic  = roundedField();
+        tfCustCnic.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "e.g. 35202-1234567-1");
 
         spDays = new JSpinner(new SpinnerNumberModel(1, 1, 365, 1));
-        spDays.setFont(FONT_LABEL);
+        spDays.setFont(FONT_UI);
+        ((JSpinner.DefaultEditor) spDays.getEditor()).getTextField()
+                .putClientProperty(FlatClientProperties.MINIMUM_WIDTH, 80);
 
-        int row = 0;
-        addRow(panel, row++, "Car Type:",      cbRentType);
-        addRow(panel, row++, "Select Car:",    cbRentCar);
-        addRow(panel, row++, "Rental Days:",   spDays);
-        addRow(panel, row++, "Customer Name:", tfCustName);
-        addRow(panel, row++, "Phone:",         tfCustPhone);
-        addRow(panel, row++, "CNIC:",          tfCustCnic);
+        JPanel form = new JPanel(new GridLayout(6, 2, 12, 14));
+        form.setOpaque(false);
+        form.add(label("Car Type"));       form.add(cbRentType);
+        form.add(label("Select Car"));     form.add(cbRentCar);
+        form.add(label("Rental Days"));    form.add(spDays);
+        form.add(label("Customer Name"));  form.add(tfCustName);
+        form.add(label("Phone"));          form.add(tfCustPhone);
+        form.add(label("CNIC"));           form.add(tfCustCnic);
 
-        JButton btnRent = styledButton("Rent Car & Generate Bill", COLOR_GREEN);
-        btnRent.addActionListener(e -> onRentCar());
-        addWideButton(panel, row, btnRent);
+        JButton btn = accentButton("Rent & Generate Bill", SUCCESS);
+        btn.addActionListener(e -> onRentCar());
 
-        return panel;
+        JPanel card = card("Rent a Car");
+        card.add(form, BorderLayout.CENTER);
+        card.add(btn,  BorderLayout.SOUTH);
+
+        wrap.add(card);
+        return wrap;
     }
 
     private void refreshRentCarBox() {
         cbRentCar.removeAllItems();
         String type = (String) cbRentType.getSelectedItem();
-        for (Car c : system.getCars()) {
-            if (c.isAvailable() && c.getCarType().equals(type)) {
+        for (Car c : system.getCars())
+            if (c.isAvailable() && c.getCarType().equals(type))
                 cbRentCar.addItem(c.getDisplayKey());
-            }
-        }
     }
 
     private void onRentCar() {
-        if (cbRentCar.getItemCount() == 0) {
-            showError("No available cars of the selected type.");
-            return;
-        }
+        if (cbRentCar.getItemCount() == 0) { showError("No available cars of this type."); return; }
         String name  = tfCustName.getText().trim();
         String phone = tfCustPhone.getText().trim();
         String cnic  = tfCustCnic.getText().trim();
         int days = (int) spDays.getValue();
+        if (name.isEmpty() || phone.isEmpty() || cnic.isEmpty()) { showError("Fill in all customer details."); return; }
 
-        if (name.isEmpty() || phone.isEmpty() || cnic.isEmpty()) {
-            showError("Please fill in all customer details.");
-            return;
-        }
+        Car car = findCarByKey((String) cbRentCar.getSelectedItem());
+        if (car == null) { showError("Car not found."); return; }
 
-        String selectedKey = (String) cbRentCar.getSelectedItem();
-        Car selectedCar = findCarByKey(selectedKey);
-        if (selectedCar == null) { showError("Selected car not found."); return; }
+        RentalRecord rec = system.rentCar(car, new Customer(name, phone, cnic), days);
+        if (rec == null) { showError("Car is no longer available."); return; }
 
-        Customer customer = new Customer(name, phone, cnic);
-        RentalRecord record = system.rentCar(selectedCar, customer, days);
-
-        if (record == null) {
-            showError("This car is no longer available.");
-        } else {
-            showBill("Rental Successful — Bill", record.getBillSummary());
-            tfCustName.setText(""); tfCustPhone.setText(""); tfCustCnic.setText("");
-            spDays.setValue(1);
-        }
+        showBill("Rental Bill", rec.getBillSummary());
+        tfCustName.setText(""); tfCustPhone.setText(""); tfCustCnic.setText("");
+        spDays.setValue(1);
         refreshAll();
     }
 
-    // ═══════════════════════  TAB 3 — RETURN CAR  ════════════════════════════
+    // ═══════════════════  TAB 3 — RETURN CAR  ════════════════════════════════
 
     private JPanel buildReturnCarPanel() {
-        JPanel panel = formPanel(new Color(255, 250, 245));
+        JPanel wrap = centeredCard();
 
-        cbReturnCar = new JComboBox<>();
+        cbReturnCar = styledCombo(new String[]{});
 
-        int row = 0;
-        addRow(panel, row++, "Select Rented Car:", cbReturnCar);
+        JPanel form = new JPanel(new GridLayout(1, 2, 12, 14));
+        form.setOpaque(false);
+        form.add(label("Select Rented Car")); form.add(cbReturnCar);
 
-        JButton btnReturn = styledButton("Return Car", COLOR_RED);
-        btnReturn.addActionListener(e -> onReturnCar());
-        addWideButton(panel, row, btnReturn);
+        JButton btn = accentButton("Return Car", DANGER);
+        btn.addActionListener(e -> onReturnCar());
 
-        return panel;
+        JPanel card = card("Return a Car");
+        card.add(form, BorderLayout.CENTER);
+        card.add(btn,  BorderLayout.SOUTH);
+
+        wrap.add(card);
+        return wrap;
     }
 
     private void onReturnCar() {
-        if (cbReturnCar.getItemCount() == 0) {
-            showError("No cars are currently rented.");
-            return;
-        }
-        String key = (String) cbReturnCar.getSelectedItem();
-        Car car = findCarByKey(key);
+        if (cbReturnCar.getItemCount() == 0) { showError("No cars are currently rented."); return; }
+        Car car = findCarByKey((String) cbReturnCar.getSelectedItem());
         if (car == null) { showError("Car not found."); return; }
 
-        RentalRecord record = system.returnCar(car);
-        if (record != null) {
-            String summary = record.getBillSummary()
-                + "\n─────────────────────────────────"
-                + "\nReturn Date : " + record.getReturnDateStr();
-            showBill("Car Returned — Final Bill", summary);
-        } else {
-            showInfo("Car returned successfully.");
-        }
+        RentalRecord rec = system.returnCar(car);
+        String msg = rec != null
+            ? rec.getBillSummary() + "\n─────────────────────────────────\nReturn Date : " + rec.getReturnDateStr()
+            : "Car returned successfully.";
+        showBill("Final Bill", msg);
         refreshAll();
     }
 
-    // ═══════════════════════  TAB 4 — VIEW CARS  ══════════════════════════════
+    // ═══════════════════  TAB 4 — VIEW CARS  ══════════════════════════════════
 
     private JPanel buildViewCarsPanel() {
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBackground(BG_PANEL);
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setBorder(new EmptyBorder(16, 16, 16, 16));
 
-        // Search bar
-        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        searchBar.setBackground(BG_PANEL);
-        searchBar.add(new JLabel("Search:"));
-        tfSearch = new JTextField(20);
-        tfSearch.setFont(FONT_LABEL);
+        // Search + Remove bar
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        bar.setOpaque(false);
+        JLabel searchIcon = new JLabel("Search:");
+        searchIcon.setFont(FONT_BOLD);
+        tfSearch = roundedField();
+        tfSearch.setPreferredSize(new Dimension(220, 32));
+        tfSearch.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Brand, model, plate...");
         tfSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e)  { filterTables(); }
             public void removeUpdate(javax.swing.event.DocumentEvent e)  { filterTables(); }
             public void changedUpdate(javax.swing.event.DocumentEvent e) { filterTables(); }
         });
-        searchBar.add(tfSearch);
 
-        JButton btnRemove = styledButton("Remove Selected", COLOR_RED);
+        JButton btnRemove = accentButton("Remove Car", DANGER);
+        btnRemove.setPreferredSize(new Dimension(130, 32));
         btnRemove.addActionListener(e -> onRemoveCar());
-        searchBar.add(btnRemove);
 
-        // Tables
-        String[] cols = {"Brand", "Model", "Plate", "Type", "Price/Day", "Status"};
-        tmAvailable = new DefaultTableModel(cols, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
-        };
-        tmRented = new DefaultTableModel(cols, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
-        };
+        bar.add(searchIcon); bar.add(tfSearch); bar.add(Box.createHorizontalStrut(8)); bar.add(btnRemove);
 
-        JTable tblAvailable = styledTable(tmAvailable);
-        JTable tblRented    = styledTable(tmRented);
+        String[] cols = {"Brand", "Model", "Plate", "Type", "Price/Day (Rs)", "Status"};
+        tmAvailable = noEditModel(cols);
+        tmRented    = noEditModel(cols);
 
-        JScrollPane spAvail  = new JScrollPane(tblAvailable);
-        JScrollPane spRented = new JScrollPane(tblRented);
+        JTable tblAvail  = styledTable(tmAvailable, true);
+        JTable tblRented = styledTable(tmRented, false);
 
-        spAvail.setBorder(titledBorder("Available Cars"));
-        spRented.setBorder(titledBorder("Rented Cars"));
+        JScrollPane spAvail  = scrollPane(tblAvail,  "Available Cars");
+        JScrollPane spRented = scrollPane(tblRented, "Rented Cars");
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, spAvail, spRented);
-        split.setResizeWeight(0.5);
+        split.setResizeWeight(0.55);
         split.setBorder(null);
+        split.setDividerSize(6);
 
-        panel.add(searchBar, BorderLayout.NORTH);
+        panel.add(bar,   BorderLayout.NORTH);
         panel.add(split, BorderLayout.CENTER);
         return panel;
     }
 
     private void onRemoveCar() {
-        // Show list of available (removable) cars in a dialog
-        List<Car> available = system.getAvailableCars();
-        if (available.isEmpty()) { showError("No available cars to remove."); return; }
-
-        String[] options = available.stream()
-                .map(Car::getDisplayKey).toArray(String[]::new);
-        String chosen = (String) JOptionPane.showInputDialog(
-                this, "Select car to remove:", "Remove Car",
-                JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
+        List<Car> avail = system.getAvailableCars();
+        if (avail.isEmpty()) { showError("No available cars to remove."); return; }
+        String[] opts = avail.stream().map(Car::getDisplayKey).toArray(String[]::new);
+        String chosen = (String) JOptionPane.showInputDialog(this, "Select car to remove:",
+                "Remove Car", JOptionPane.PLAIN_MESSAGE, null, opts, opts[0]);
         if (chosen == null) return;
-
         Car car = findCarByKey(chosen);
         if (car != null && system.removeCar(car)) {
-            showInfo("Car removed: " + chosen);
+            showSuccess("Removed: " + chosen);
             refreshAll();
         } else {
-            showError("Could not remove car (it may currently be rented).");
+            showError("Cannot remove a currently rented car.");
         }
     }
 
     private void filterTables() {
-        String q = tfSearch.getText().trim().toLowerCase();
-        updateViewTables(q);
+        updateViewTables(tfSearch.getText().trim().toLowerCase());
     }
 
-    // ═══════════════════════  TAB 5 — HISTORY  ════════════════════════════════
+    // ═══════════════════  TAB 5 — HISTORY  ════════════════════════════════════
 
     private JPanel buildHistoryPanel() {
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBackground(BG_PANEL);
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setBorder(new EmptyBorder(16, 16, 16, 16));
 
         String[] cols = {"Customer", "Phone", "Car", "Type", "Days", "Total (Rs)", "Rented On", "Returned On", "Status"};
-        tmHistory = new DefaultTableModel(cols, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
-        };
+        tmHistory = noEditModel(cols);
+        JTable tbl = styledTable(tmHistory, true);
 
-        JTable tbl = styledTable(tmHistory);
         TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(tmHistory);
         tbl.setRowSorter(sorter);
 
+        // Status column coloring
+        tbl.getColumnModel().getColumn(8).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v,
+                    boolean sel, boolean foc, int r, int c) {
+                super.getTableCellRendererComponent(t, v, sel, foc, r, c);
+                setHorizontalAlignment(CENTER);
+                String val = v == null ? "" : v.toString();
+                if (!sel) setForeground("Active".equals(val) ? SUCCESS : TEXT_MUTED);
+                return this;
+            }
+        });
+
         JScrollPane sp = new JScrollPane(tbl);
-        sp.setBorder(titledBorder("All Rental Transactions"));
-
-        JButton btnRefresh = styledButton("Refresh", COLOR_BLUE);
-        btnRefresh.addActionListener(e -> updateHistoryTable());
-
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottom.setBackground(BG_PANEL);
-        bottom.add(btnRefresh);
+        sp.setBorder(titledBorder("All Rental Transactions (click column header to sort)"));
 
         panel.add(sp, BorderLayout.CENTER);
-        panel.add(bottom, BorderLayout.SOUTH);
         return panel;
     }
 
-    // ═══════════════════════  REFRESH HELPERS  ════════════════════════════════
+    // ══════════════════════  REFRESH HELPERS  ════════════════════════════════
 
     private void refreshAll() {
         updateViewTables("");
         refreshRentCarBox();
-        refreshReturnBox();
+        cbReturnCar.removeAllItems();
+        for (Car c : system.getRentedCars()) cbReturnCar.addItem(c.getDisplayKey());
         updateHistoryTable();
         if (tfSearch != null) tfSearch.setText("");
+        if (statsBadge != null) updateStatsBadge(statsBadge);
     }
 
-    private void updateViewTables(String query) {
+    private void updateViewTables(String q) {
         tmAvailable.setRowCount(0);
         tmRented.setRowCount(0);
         for (Car c : system.getCars()) {
-            String row5 = String.format("%.0f", c.getPricePerDay());
-            Object[] row = {c.getBrand(), c.getModel(), c.getPlateNumber(),
-                            c.getCarType(), row5,
-                            c.isAvailable() ? "Available" : "Rented"};
-            boolean matches = query.isEmpty() ||
-                    c.getBrand().toLowerCase().contains(query) ||
-                    c.getModel().toLowerCase().contains(query) ||
-                    c.getPlateNumber().toLowerCase().contains(query) ||
-                    c.getCarType().toLowerCase().contains(query);
+            boolean matches = q.isEmpty()
+                || c.getBrand().toLowerCase().contains(q)
+                || c.getModel().toLowerCase().contains(q)
+                || c.getPlateNumber().toLowerCase().contains(q)
+                || c.getCarType().toLowerCase().contains(q);
             if (!matches) continue;
+            Object[] row = {c.getBrand(), c.getModel(), c.getPlateNumber(),
+                            c.getCarType(), String.format("%.0f", c.getPricePerDay()),
+                            c.isAvailable() ? "Available" : "Rented"};
             if (c.isAvailable()) tmAvailable.addRow(row);
             else                 tmRented.addRow(row);
-        }
-    }
-
-    private void refreshReturnBox() {
-        cbReturnCar.removeAllItems();
-        for (Car c : system.getRentedCars()) {
-            cbReturnCar.addItem(c.getDisplayKey());
         }
     }
 
@@ -390,120 +422,161 @@ public class MainGui extends JFrame {
         tmHistory.setRowCount(0);
         for (RentalRecord r : system.getAllRecords()) {
             tmHistory.addRow(new Object[]{
-                r.getCustomer().getName(),
-                r.getCustomer().getPhone(),
+                r.getCustomer().getName(), r.getCustomer().getPhone(),
                 r.getCar().getBrand() + " " + r.getCar().getModel(),
-                r.getCar().getCarType(),
-                r.getDays(),
+                r.getCar().getCarType(), r.getDays(),
                 String.format("%.2f", r.getTotalCost()),
-                r.getRentalDateStr(),
-                r.getReturnDateStr(),
-                r.getStatus()
+                r.getRentalDateStr(), r.getReturnDateStr(), r.getStatus()
             });
         }
     }
 
-    // ═══════════════════════  UI UTILITIES  ════════════════════════════════════
+    // ══════════════════════  UI HELPERS  ═════════════════════════════════════
 
-    private JPanel formPanel(Color bg) {
-        JPanel p = new JPanel(new GridBagLayout());
-        p.setBackground(bg);
-        p.setBorder(new EmptyBorder(20, 40, 20, 40));
-        return p;
+    /** Centered wrapper so the card stays compact in wide windows. */
+    private JPanel centeredCard() {
+        JPanel wrap = new JPanel(new GridBagLayout());
+        return wrap;
     }
 
-    private void addRow(JPanel panel, int row, String labelText, JComponent field) {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(7, 8, 7, 8);
-        gbc.anchor = GridBagConstraints.WEST;
+    /** White rounded card with a section title. */
+    private JPanel card(String title) {
+        JPanel card = new JPanel(new BorderLayout(0, 16));
+        card.setBorder(new EmptyBorder(28, 32, 28, 32));
+        card.setPreferredSize(new Dimension(460, 0));
 
-        JLabel label = new JLabel(labelText);
-        label.setFont(FONT_LABEL);
-        label.setForeground(COLOR_DARK);
+        JLabel lbl = new JLabel(title);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        JPanel sep = new JPanel(new BorderLayout(0, 8));
+        sep.setOpaque(false);
+        sep.add(lbl, BorderLayout.NORTH);
+        sep.add(new JSeparator(), BorderLayout.SOUTH);
 
-        if (field instanceof JTextField tf) tf.setFont(FONT_LABEL);
-
-        gbc.gridx = 0; gbc.gridy = row; gbc.fill = GridBagConstraints.NONE;
-        panel.add(label, gbc);
-        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
-        panel.add(field, gbc);
+        card.add(sep, BorderLayout.NORTH);
+        return card;
     }
 
-    private void addWideButton(JPanel panel, int row, JButton btn) {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(14, 8, 7, 8);
-        panel.add(btn, gbc);
+    private JLabel label(String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(FONT_BOLD);
+        return l;
     }
 
-    private JButton styledButton(String text, Color bg) {
+    private JTextField roundedField() {
+        JTextField tf = new JTextField();
+        tf.setFont(FONT_UI);
+        tf.putClientProperty(FlatClientProperties.MINIMUM_WIDTH, 180);
+        return tf;
+    }
+
+    private JComboBox<String> styledCombo(String[] items) {
+        JComboBox<String> cb = new JComboBox<>(items);
+        cb.setFont(FONT_UI);
+        return cb;
+    }
+
+    private JButton accentButton(String text, Color bg) {
         JButton btn = new JButton(text);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setFont(FONT_BOLD);
         btn.setBackground(bg);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setOpaque(true);
+        btn.setPreferredSize(new Dimension(200, 38));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_ROUND_RECT);
         return btn;
     }
 
-    private JTable styledTable(DefaultTableModel model) {
-        JTable table = new JTable(model);
-        table.setFont(FONT_LABEL);
-        table.setRowHeight(24);
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
-        table.getTableHeader().setBackground(COLOR_DARK);
-        table.getTableHeader().setForeground(Color.WHITE);
-        table.setSelectionBackground(new Color(173, 216, 230));
-        table.setGridColor(new Color(220, 220, 220));
-        table.setShowGrid(true);
-        return table;
+    private JTable styledTable(DefaultTableModel model, boolean stripedAvail) {
+        JTable t = new JTable(model);
+        t.setFont(FONT_UI);
+        t.setRowHeight(28);
+        t.getTableHeader().setFont(FONT_BOLD);
+        t.setShowVerticalLines(false);
+        t.setIntercellSpacing(new Dimension(0, 0));
+        t.setFillsViewportHeight(true);
+        t.putClientProperty(FlatClientProperties.STYLE,
+                "showHorizontalLines: true; alternateRowColor: $Table.alternateRowBackground");
+        return t;
     }
 
-    private TitledBorder titledBorder(String title) {
-        TitledBorder tb = BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(COLOR_DARK, 1), title);
-        tb.setTitleFont(FONT_TITLE);
-        tb.setTitleColor(COLOR_DARK);
-        return tb;
+    private JScrollPane scrollPane(JTable table, String title) {
+        JScrollPane sp = new JScrollPane(table);
+        sp.setBorder(titledBorder(title));
+        return sp;
     }
 
-    private void showInfo(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Info",
-                JOptionPane.INFORMATION_MESSAGE);
+    private javax.swing.border.Border titledBorder(String title) {
+        return BorderFactory.createTitledBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, UIManager.getColor("Separator.foreground")),
+            title, javax.swing.border.TitledBorder.LEFT,
+            javax.swing.border.TitledBorder.TOP, FONT_BOLD);
     }
+
+    private DefaultTableModel noEditModel(String[] cols) {
+        return new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+    }
+
+    // ── Dialogs ───────────────────────────────────────────────────────────────
 
     private void showError(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Error",
-                JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
-    private void showBill(String title, String billText) {
-        JTextArea area = new JTextArea(billText);
-        area.setFont(new Font("Monospaced", Font.PLAIN, 13));
+    private void showSuccess(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void showBill(String title, String text) {
+        JTextArea area = new JTextArea(text);
+        area.setFont(new Font("JetBrains Mono", Font.PLAIN, 13));
         area.setEditable(false);
-        area.setBackground(new Color(250, 250, 250));
+        area.setBorder(new EmptyBorder(12, 16, 12, 16));
         JOptionPane.showMessageDialog(this, new JScrollPane(area), title,
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // ═══════════════════════  LOOKUP HELPER  ══════════════════════════════════
+    // ── Misc ──────────────────────────────────────────────────────────────────
 
     private Car findCarByKey(String key) {
         if (key == null) return null;
-        for (Car c : system.getCars()) {
+        for (Car c : system.getCars())
             if (c.getDisplayKey().equals(key)) return c;
-        }
         return null;
     }
 
-    // ═══════════════════════  LOOK & FEEL  ════════════════════════════════════
+    /** Tiny filled circle icon used in the header. */
+    private Icon colorIcon(Color color, int size) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 60));
+                g2.fillOval(x, y, size - 4, size - 4);
+                g2.dispose();
+            }
+            public int getIconWidth()  { return size; }
+            public int getIconHeight() { return size; }
+        };
+    }
 
-    private static void applySystemLookAndFeel() {
+    // ══════════════════════  ENTRY POINT  ════════════════════════════════════
+
+    public static void setup() {
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            FlatDarkLaf.setup();
+            UIManager.put("defaultFont", FONT_UI);
+            UIManager.put("TabbedPane.tabInsets", new Insets(6, 16, 6, 16));
+            UIManager.put("TabbedPane.selectedBackground", ACCENT);
+            UIManager.put("TabbedPane.selectedForeground", Color.WHITE);
+            UIManager.put("Button.arc", 8);
+            UIManager.put("Component.arc", 8);
+            UIManager.put("TextComponent.arc", 8);
+            UIManager.put("Table.alternateRowBackground", new Color(30, 33, 48));
         } catch (Exception ignored) {}
     }
 }

@@ -8,6 +8,7 @@ import javax.swing.SwingUtilities;
 public class CarRentalSystem {
 
     public static void main(String[] args) {
+        MainGui.setup();
         SwingUtilities.invokeLater(() -> new MainGui().setVisible(true));
     }
 }

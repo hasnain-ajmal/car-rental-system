@@ -24,6 +24,15 @@
         <exec.mainClass>com.mycompany.carrentalsystem.CarRentalSystem</exec.mainClass>
     </properties>
 
+    <dependencies>
+        <!-- Modern flat UI theme for Java Swing -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.4</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <!-- Build a runnable fat JAR -->
